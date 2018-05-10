@@ -25,13 +25,12 @@ def append_response(response,title,value):
 	response['attachments'][0][title] = value
 	return response
 
-	
+
 def respond(err,response_url,res=None):
 	if not err:
 		logger.info("Responding to Slack -- response: %s" % res)
 	else:
 		logger.info("Slack response error: %s" % err)
-		
 	req = Request(response_url, json.dumps(res))
 	try:
 		makereq = urlopen(req)
@@ -85,21 +84,23 @@ def shared_parse(response,jdata):
 		logger.info('Hash not found in VT')
 
 	response = append_response(response,"title_link",jdata['permalink'])
-	
+
 	positives = str(jdata['positives'])
 	if jdata['positives'] > 0:
 		response = append_response(response,"color","danger")
 	else:
 		response = append_response(response,"color","good")
 
-	response = add_field(response,"Last Scanned",jdata['scan_date'],True)	
+	response = add_field(response,"Last Scanned",jdata['scan_date'],True)
 	total = str(jdata['total'])
 	response = add_field(response,"Positive Detections",positives + "/" + total,True)
 	return response
 
 
 def parse(response,jdata):
-	response = shared_parse(response,jdata)	
+	response = shared_parse(response,jdata)
+	if jdata['sha256']:
+		response = add_field(response,"SHA256",jdata['sha256'],True)
 	for vendor in jdata['scans']:
 		if jdata['scans'][vendor]['detected']:
 			if not jdata['scans'][vendor]['result']:
@@ -139,7 +140,7 @@ def lambda_handler(event, context):
 	params = parse_qs(event['body'])
 	token = params['token'][0]
 	response_url = params['response_url'][0]
-	
+
 	if token != expected_token:
 		logger.error("Request token (%s) does not match expected", token)
 		return "Invalid request token"
@@ -156,17 +157,17 @@ def lambda_handler(event, context):
 
 	command = params['command'][0]
 	logger.info("command: %s", command)
-	
+
 	channel = params['channel_name'][0]
 	logger.info("channel: %s", channel)
-	
+
 	command_text = params['text'][0]
 	logger.info("command_text: %s", command_text)
 
 	user = params['user_name'][0]
 	logger.info("user: %s", user)
 	response = append_response(response,"author_name",user)
-	
+
 	activity = "%s results for %s" % (command,command_text)
 	response = append_response(response,"title",activity)
 
